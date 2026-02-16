@@ -8,19 +8,51 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
+  id        String     @id @default(uuid())
+  email     String     @unique
   password  String
   name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
   scans     Scan[]
+  buildings Building[]
+  rooms     Room[]
+}
+
+model Building {
+  id        String   @id @default(uuid())
+  name      String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  rooms     Room[]
+  scans     Scan[]
+
+  @@index([userId])
+}
+
+model Room {
+  id         String   @id @default(uuid())
+  name       String
+  buildingId String
+  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  createdAt  DateTime @default(now())
+  scans      Scan[]
+
+  @@index([buildingId])
+  @@index([userId])
 }
 
 model Scan {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   userId       String?
-  user         User?    @relation(fields: [userId], references: [id])
+  user         User?     @relation(fields: [userId], references: [id])
+  buildingId   String?
+  building     Building? @relation(fields: [buildingId], references: [id])
+  roomId       String?
+  room         Room?     @relation(fields: [roomId], references: [id])
   imageUrl     String?
   rawText      String?
   manufacturer String?
@@ -33,4 +65,6 @@ model Scan {
 
   @@index([userId])
   @@index([batchId])
+  @@index([buildingId])
+  @@index([roomId])
 }

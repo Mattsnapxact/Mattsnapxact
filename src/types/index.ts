@@ -15,6 +15,10 @@ export interface ScanItem {
   editedData: ExtractedLabel;
   timestamp: Date;
   status: "processing" | "review" | "confirmed";
+  buildingId?: string;
+  buildingName?: string;
+  roomId?: string;
+  roomName?: string;
 }
 
 export interface BatchExport {

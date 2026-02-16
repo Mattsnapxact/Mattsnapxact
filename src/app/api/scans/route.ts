@@ -33,6 +33,8 @@ export async function POST(request: NextRequest) {
         assetTag?: string;
         extraFields?: Record<string, string>;
         rawText?: string;
+        buildingId?: string;
+        roomId?: string;
       }) =>
         prisma.scan.create({
           data: {
@@ -46,6 +48,8 @@ export async function POST(request: NextRequest) {
               ? JSON.stringify(scan.extraFields)
               : null,
             rawText: scan.rawText || null,
+            buildingId: scan.buildingId || null,
+            roomId: scan.roomId || null,
           },
         })
       )
@@ -75,6 +79,10 @@ export async function GET() {
 
     const scans = await prisma.scan.findMany({
       where: { userId },
+      include: {
+        building: { select: { id: true, name: true } },
+        room: { select: { id: true, name: true } },
+      },
       orderBy: { createdAt: "desc" },
       take: 100,
     });
@@ -82,6 +90,8 @@ export async function GET() {
     const parsed = scans.map((scan) => ({
       ...scan,
       extraFields: scan.extraFields ? JSON.parse(scan.extraFields) : {},
+      buildingName: scan.building?.name || null,
+      roomName: scan.room?.name || null,
     }));
 
     return NextResponse.json({ scans: parsed });

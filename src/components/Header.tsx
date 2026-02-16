@@ -51,6 +51,12 @@ export default function Header() {
               >
                 History
               </Link>
+              <Link
+                href="/locations"
+                className="text-sm font-medium text-surface-600 hover:text-brand-600 transition-default"
+              >
+                Locations
+              </Link>
               <button
                 onClick={() => signOut()}
                 className="text-sm font-medium text-surface-400 hover:text-surface-600 transition-default"

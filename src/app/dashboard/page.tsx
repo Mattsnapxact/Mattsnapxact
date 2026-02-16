@@ -17,6 +17,10 @@ interface SavedScan {
   rawText: string | null;
   createdAt: string;
   batchId: string | null;
+  buildingId: string | null;
+  buildingName: string | null;
+  roomId: string | null;
+  roomName: string | null;
 }
 
 export default function DashboardPage() {
@@ -68,6 +72,10 @@ export default function DashboardPage() {
       },
       timestamp: new Date(scan.createdAt),
       status: "confirmed",
+      buildingId: scan.buildingId || undefined,
+      buildingName: scan.buildingName || undefined,
+      roomId: scan.roomId || undefined,
+      roomName: scan.roomName || undefined,
     }));
 
     const csv = generateCSV(items);
@@ -184,6 +192,11 @@ export default function DashboardPage() {
                   {scan.model || ""}
                 </p>
                 <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
+                  {(scan.buildingName || scan.roomName) && (
+                    <span className="text-xs text-brand-600 font-medium">
+                      {[scan.buildingName, scan.roomName].filter(Boolean).join(" / ")}
+                    </span>
+                  )}
                   {scan.serialNumber && (
                     <span className="text-xs text-surface-500">
                       S/N: {scan.serialNumber}

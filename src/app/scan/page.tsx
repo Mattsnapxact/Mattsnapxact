@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { v4 as uuidv4 } from "uuid";
 import CameraCapture from "@/components/CameraCapture";
 import ScanList from "@/components/ScanList";
+import LocationPicker, { SelectedLocation } from "@/components/LocationPicker";
 import { ScanItem, ExtractedLabel } from "@/types";
 
 export default function ScanPage() {
@@ -12,6 +13,12 @@ export default function ScanPage() {
   const [items, setItems] = useState<ScanItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [location, setLocation] = useState<SelectedLocation>({
+    buildingId: "",
+    buildingName: "",
+    roomId: "",
+    roomName: "",
+  });
 
   const handleCapture = useCallback(
     async (base64: string, mimeType: string, preview: string) => {
@@ -42,6 +49,10 @@ export default function ScanPage() {
         },
         timestamp: new Date(),
         status: "processing",
+        buildingId: location.buildingId || undefined,
+        buildingName: location.buildingName || undefined,
+        roomId: location.roomId || undefined,
+        roomName: location.roomName || undefined,
       };
 
       setItems((prev) => [placeholderItem, ...prev]);
@@ -81,7 +92,7 @@ export default function ScanPage() {
         setIsProcessing(false);
       }
     },
-    []
+    [location]
   );
 
   const handleUpdateItem = useCallback(
@@ -132,6 +143,8 @@ export default function ScanPage() {
             assetTag: item.editedData.assetTag,
             extraFields: item.editedData.extraFields,
             rawText: item.editedData.rawText,
+            buildingId: item.buildingId || null,
+            roomId: item.roomId || null,
           })),
         }),
       });
@@ -151,6 +164,11 @@ export default function ScanPage() {
           Take a photo or upload an image of an equipment label.
           We&apos;ll extract the data automatically.
         </p>
+      </div>
+
+      {/* Location picker (logged-in users) */}
+      <div className="mb-6">
+        <LocationPicker value={location} onChange={setLocation} />
       </div>
 
       {/* Camera / Upload */}

@@ -21,6 +21,8 @@ export function generateCSV(items: ScanItem[]): string {
 
   // Build header row
   const baseHeaders = [
+    "Building",
+    "Room",
     "Manufacturer",
     "Model",
     "Serial Number",
@@ -35,6 +37,8 @@ export function generateCSV(items: ScanItem[]): string {
   const rows = items.map((item) => {
     const data = item.editedData;
     const baseFields = [
+      item.buildingName || "",
+      item.roomName || "",
       data.manufacturer,
       data.model,
       data.serialNumber,
