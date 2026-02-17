@@ -13,59 +13,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { scans, batchId } = body;
-
-    if (!scans || !Array.isArray(scans)) {
-      return NextResponse.json(
-        { error: "Scans array is required" },
-        { status: 400 }
-      );
-    }
-
     const userId = (session.user as { id: string }).id;
+    const body = await request.json();
 
-    const savedScans = await prisma.$transaction(
-      scans.map((scan: {
-        manufacturer?: string;
-        model?: string;
-        serialNumber?: string;
-        assetTag?: string;
-        extraFields?: Record<string, string>;
-        rawText?: string;
-        buildingId?: string;
-        roomId?: string;
-      }) =>
-        prisma.scan.create({
-          data: {
-            userId,
-            batchId: batchId || null,
-            manufacturer: scan.manufacturer || null,
-            model: scan.model || null,
-            serialNumber: scan.serialNumber || null,
-            assetTag: scan.assetTag || null,
-            extraFields: scan.extraFields
-              ? JSON.stringify(scan.extraFields)
-              : null,
-            rawText: scan.rawText || null,
-            buildingId: scan.buildingId || null,
-            roomId: scan.roomId || null,
-          },
-        })
-      )
-    );
+    // Single scan auto-save
+    const scan = await prisma.scan.create({
+      data: {
+        userId,
+        status: body.status || "draft",
+        manufacturer: body.manufacturer || null,
+        model: body.model || null,
+        serialNumber: body.serialNumber || null,
+        assetTag: body.assetTag || null,
+        extraFields: body.extraFields
+          ? JSON.stringify(body.extraFields)
+          : null,
+        rawText: body.rawText || null,
+        buildingId: body.buildingId || null,
+        roomId: body.roomId || null,
+        batchId: body.batchId || null,
+      },
+    });
 
-    return NextResponse.json({ scans: savedScans }, { status: 201 });
+    return NextResponse.json({ scan }, { status: 201 });
   } catch (error) {
-    console.error("Save scans error:", error);
+    console.error("Save scan error:", error);
     return NextResponse.json(
-      { error: "Failed to save scans" },
+      { error: "Failed to save scan" },
       { status: 500 }
     );
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
@@ -76,9 +56,14 @@ export async function GET() {
     }
 
     const userId = (session.user as { id: string }).id;
+    const { searchParams } = new URL(request.url);
+    const statusFilter = searchParams.get("status"); // "draft", "confirmed", or null (all)
+
+    const where: Record<string, unknown> = { userId };
+    if (statusFilter) where.status = statusFilter;
 
     const scans = await prisma.scan.findMany({
-      where: { userId },
+      where,
       include: {
         building: { select: { id: true, name: true } },
         room: { select: { id: true, name: true } },

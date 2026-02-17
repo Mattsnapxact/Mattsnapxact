@@ -9,6 +9,7 @@ import { ScanItem } from "@/types";
 
 interface SavedScan {
   id: string;
+  status: string;
   manufacturer: string | null;
   model: string | null;
   serialNumber: string | null;
@@ -28,6 +29,10 @@ export default function DashboardPage() {
   const router = useRouter();
   const [scans, setScans] = useState<SavedScan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [includeDrafts, setIncludeDrafts] = useState(false);
+
+  const confirmedCount = scans.filter((s) => s.status === "confirmed").length;
+  const draftCount = scans.filter((s) => s.status === "draft").length;
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -47,10 +52,13 @@ export default function DashboardPage() {
     }
   }, [session]);
 
-  const handleExportAll = () => {
-    if (scans.length === 0) return;
+  const handleExport = () => {
+    const exportScans = includeDrafts
+      ? scans
+      : scans.filter((s) => s.status === "confirmed");
+    if (exportScans.length === 0) return;
 
-    const items: ScanItem[] = scans.map((scan) => ({
+    const items: ScanItem[] = exportScans.map((scan) => ({
       id: scan.id,
       extractedData: {
         manufacturer: scan.manufacturer || "",
@@ -71,7 +79,7 @@ export default function DashboardPage() {
         confidence: "high",
       },
       timestamp: new Date(scan.createdAt),
-      status: "confirmed",
+      status: (scan.status === "confirmed" ? "confirmed" : "draft") as "confirmed" | "draft",
       buildingId: scan.buildingId || undefined,
       buildingName: scan.buildingName || undefined,
       roomId: scan.roomId || undefined,
@@ -115,30 +123,44 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold text-surface-900">Scan History</h1>
           <p className="text-sm text-surface-500 mt-1">
-            {scans.length} {scans.length === 1 ? "scan" : "scans"} saved
+            {confirmedCount} confirmed{draftCount > 0 ? `, ${draftCount} draft${draftCount !== 1 ? "s" : ""}` : ""} &mdash; {scans.length} total
           </p>
         </div>
         <div className="flex items-center gap-3">
           {scans.length > 0 && (
-            <button
-              onClick={handleExportAll}
-              className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium py-2 px-4 rounded-lg transition-default"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            <>
+              {draftCount > 0 && (
+                <label className="flex items-center gap-1.5 text-xs text-surface-500 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={includeDrafts}
+                    onChange={(e) => setIncludeDrafts(e.target.checked)}
+                    className="rounded border-surface-300 text-brand-600 focus:ring-brand-500"
+                  />
+                  Include drafts
+                </label>
+              )}
+              <button
+                onClick={handleExport}
+                disabled={includeDrafts ? scans.length === 0 : confirmedCount === 0}
+                className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium py-2 px-4 rounded-lg transition-default disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              Export All
-            </button>
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                Export{includeDrafts ? " All" : " Confirmed"}
+              </button>
+            </>
           )}
           <Link
             href="/scan"
@@ -186,11 +208,22 @@ export default function DashboardPage() {
               key={scan.id}
               className="bg-white border border-surface-200 rounded-xl px-5 py-4 flex items-center justify-between"
             >
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-surface-800 truncate">
-                  {scan.manufacturer || "Unknown"}{" "}
-                  {scan.model || ""}
-                </p>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-surface-800 truncate">
+                    {scan.manufacturer || "Unknown"}{" "}
+                    {scan.model || ""}
+                  </p>
+                  <span
+                    className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${
+                      scan.status === "confirmed"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-amber-100 text-amber-700"
+                    }`}
+                  >
+                    {scan.status === "confirmed" ? "Confirmed" : "Draft"}
+                  </span>
+                </div>
                 <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
                   {(scan.buildingName || scan.roomName) && (
                     <span className="text-xs text-brand-600 font-medium">

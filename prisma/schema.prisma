@@ -53,6 +53,7 @@ model Scan {
   building     Building? @relation(fields: [buildingId], references: [id])
   roomId       String?
   room         Room?     @relation(fields: [roomId], references: [id])
+  status       String    @default("draft") // "draft" or "confirmed"
   imageUrl     String?
   rawText      String?
   manufacturer String?
@@ -61,10 +62,12 @@ model Scan {
   assetTag     String?
   extraFields  String?  // JSON string for additional detected fields
   createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
   batchId      String?
 
   @@index([userId])
   @@index([batchId])
   @@index([buildingId])
   @@index([roomId])
+  @@index([userId, status])
 }

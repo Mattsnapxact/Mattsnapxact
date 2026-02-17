@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { v4 as uuidv4 } from "uuid";
 import CameraCapture from "@/components/CameraCapture";
@@ -13,12 +13,122 @@ export default function ScanPage() {
   const [items, setItems] = useState<ScanItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [draftsLoaded, setDraftsLoaded] = useState(false);
   const [location, setLocation] = useState<SelectedLocation>({
     buildingId: "",
     buildingName: "",
     roomId: "",
     roomName: "",
   });
+  const prevLocationRef = useRef(location);
+
+  // Load existing drafts when location changes (logged-in users)
+  useEffect(() => {
+    if (!session) return;
+    const prev = prevLocationRef.current;
+    prevLocationRef.current = location;
+
+    // Skip if location hasn't actually changed (initial render handled by draftsLoaded)
+    if (draftsLoaded && prev.buildingId === location.buildingId && prev.roomId === location.roomId) return;
+
+    const params = new URLSearchParams();
+    if (location.buildingId) params.set("buildingId", location.buildingId);
+    if (location.roomId) params.set("roomId", location.roomId);
+
+    fetch(`/api/scans/drafts?${params}`)
+      .then((res) => res.json())
+      .then((data) => {
+        const drafts: ScanItem[] = (data.scans || []).map(
+          (scan: {
+            id: string;
+            manufacturer: string | null;
+            model: string | null;
+            serialNumber: string | null;
+            assetTag: string | null;
+            extraFields: Record<string, string>;
+            rawText: string | null;
+            createdAt: string;
+            buildingId: string | null;
+            buildingName: string | null;
+            roomId: string | null;
+            roomName: string | null;
+            confidence?: string;
+          }) => ({
+            id: uuidv4(),
+            dbId: scan.id,
+            extractedData: {
+              manufacturer: scan.manufacturer || "",
+              model: scan.model || "",
+              serialNumber: scan.serialNumber || "",
+              assetTag: scan.assetTag || "",
+              extraFields: scan.extraFields || {},
+              rawText: scan.rawText || "",
+              confidence: "high" as const,
+            },
+            editedData: {
+              manufacturer: scan.manufacturer || "",
+              model: scan.model || "",
+              serialNumber: scan.serialNumber || "",
+              assetTag: scan.assetTag || "",
+              extraFields: scan.extraFields || {},
+              rawText: scan.rawText || "",
+              confidence: "high" as const,
+            },
+            timestamp: new Date(scan.createdAt),
+            status: "draft" as const,
+            buildingId: scan.buildingId || undefined,
+            buildingName: scan.buildingName || undefined,
+            roomId: scan.roomId || undefined,
+            roomName: scan.roomName || undefined,
+          })
+        );
+
+        // Merge: keep processing items, replace drafts
+        setItems((prev) => {
+          const processingItems = prev.filter((i) => i.status === "processing");
+          const newItems = prev.filter(
+            (i) => i.status !== "processing" && i.status !== "draft"
+          );
+          return [...processingItems, ...newItems, ...drafts];
+        });
+        setDraftsLoaded(true);
+      })
+      .catch(() => {
+        setDraftsLoaded(true);
+      });
+  }, [session, location, draftsLoaded]);
+
+  // Auto-save a scan to the database
+  const autoSave = useCallback(
+    async (data: ExtractedLabel, loc: SelectedLocation): Promise<string | null> => {
+      if (!session) return null;
+
+      try {
+        const res = await fetch("/api/scans", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            status: "draft",
+            manufacturer: data.manufacturer,
+            model: data.model,
+            serialNumber: data.serialNumber,
+            assetTag: data.assetTag,
+            extraFields: data.extraFields,
+            rawText: data.rawText,
+            buildingId: loc.buildingId || null,
+            roomId: loc.roomId || null,
+          }),
+        });
+
+        if (!res.ok) return null;
+        const { scan } = await res.json();
+        return scan.id as string;
+      } catch {
+        return null;
+      }
+    },
+    [session]
+  );
 
   const handleCapture = useCallback(
     async (base64: string, mimeType: string, preview: string) => {
@@ -71,14 +181,18 @@ export default function ScanPage() {
 
         const { data } = (await response.json()) as { data: ExtractedLabel };
 
+        // Auto-save to DB for logged-in users
+        const dbId = await autoSave(data, location);
+
         setItems((prev) =>
           prev.map((item) =>
             item.id === tempId
               ? {
                   ...item,
+                  dbId: dbId || undefined,
                   extractedData: data,
                   editedData: { ...data },
-                  status: "review" as const,
+                  status: "draft" as const,
                 }
               : item
           )
@@ -92,7 +206,7 @@ export default function ScanPage() {
         setIsProcessing(false);
       }
     },
-    [location]
+    [location, autoSave]
   );
 
   const handleUpdateItem = useCallback(
@@ -106,55 +220,62 @@ export default function ScanPage() {
     []
   );
 
-  const handleConfirmItem = useCallback((id: string) => {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, status: "confirmed" as const } : item
-      )
-    );
-  }, []);
+  const handleConfirmItem = useCallback(
+    async (id: string) => {
+      const item = items.find((i) => i.id === id);
+      if (!item) return;
 
-  const handleRemoveItem = useCallback((id: string) => {
-    setItems((prev) => prev.filter((item) => item.id !== id));
-  }, []);
+      // Update DB record if we have one
+      if (item.dbId && session) {
+        try {
+          await fetch(`/api/scans/${item.dbId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              status: "confirmed",
+              manufacturer: item.editedData.manufacturer,
+              model: item.editedData.model,
+              serialNumber: item.editedData.serialNumber,
+              assetTag: item.editedData.assetTag,
+              extraFields: item.editedData.extraFields,
+              rawText: item.editedData.rawText,
+            }),
+          });
+        } catch {
+          // Silently fail — local state still updates
+        }
+      }
+
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === id ? { ...i, status: "confirmed" as const } : i
+        )
+      );
+    },
+    [items, session]
+  );
+
+  const handleRemoveItem = useCallback(
+    async (id: string) => {
+      const item = items.find((i) => i.id === id);
+
+      // Delete from DB if we have a record
+      if (item?.dbId && session) {
+        try {
+          await fetch(`/api/scans/${item.dbId}`, { method: "DELETE" });
+        } catch {
+          // Silently fail
+        }
+      }
+
+      setItems((prev) => prev.filter((i) => i.id !== id));
+    },
+    [items, session]
+  );
 
   const handleClearAll = useCallback(() => {
     setItems([]);
   }, []);
-
-  const handleSaveToAccount = async () => {
-    if (!session) return;
-
-    const confirmedItems = items.filter(
-      (i) => i.status === "confirmed" || i.status === "review"
-    );
-    if (confirmedItems.length === 0) return;
-
-    try {
-      const response = await fetch("/api/scans", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          batchId: uuidv4(),
-          scans: confirmedItems.map((item) => ({
-            manufacturer: item.editedData.manufacturer,
-            model: item.editedData.model,
-            serialNumber: item.editedData.serialNumber,
-            assetTag: item.editedData.assetTag,
-            extraFields: item.editedData.extraFields,
-            rawText: item.editedData.rawText,
-            buildingId: item.buildingId || null,
-            roomId: item.roomId || null,
-          })),
-        }),
-      });
-
-      if (!response.ok) throw new Error("Failed to save");
-      alert("Scans saved to your account!");
-    } catch {
-      alert("Failed to save scans. Please try again.");
-    }
-  };
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
@@ -182,6 +303,16 @@ export default function ScanPage() {
         </div>
       )}
 
+      {/* Auto-save indicator */}
+      {session && items.some((i) => i.dbId) && (
+        <div className="mt-4 flex items-center gap-2 text-xs text-surface-400">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          Scans are automatically saved to your account
+        </div>
+      )}
+
       {/* Scan results list */}
       <div className="mt-8">
         <ScanList
@@ -192,18 +323,6 @@ export default function ScanPage() {
           onClearAll={handleClearAll}
         />
       </div>
-
-      {/* Save to account button (logged in users only) */}
-      {session && items.length > 0 && (
-        <div className="mt-4">
-          <button
-            onClick={handleSaveToAccount}
-            className="w-full text-sm font-medium text-brand-600 hover:text-brand-700 py-2 transition-default"
-          >
-            Save to my account
-          </button>
-        </div>
-      )}
     </div>
   );
 }

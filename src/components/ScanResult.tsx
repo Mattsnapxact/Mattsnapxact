@@ -16,7 +16,7 @@ export default function ScanResult({
   onConfirm,
   onRemove,
 }: ScanResultProps) {
-  const [isEditing, setIsEditing] = useState(item.status === "review");
+  const [isEditing, setIsEditing] = useState(item.status === "draft");
   const data = item.editedData;
 
   const updateField = (field: string, value: string) => {
@@ -72,11 +72,30 @@ export default function ScanResult({
               {data.manufacturer || "Unknown"}{" "}
               {data.model || ""}
             </p>
-            <span
-              className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium mt-0.5 ${confidenceColor}`}
-            >
-              {data.confidence} confidence
-            </span>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span
+                className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium ${confidenceColor}`}
+              >
+                {data.confidence} confidence
+              </span>
+              {item.status === "draft" && (
+                <span className="inline-block text-xs px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700">
+                  Draft
+                </span>
+              )}
+              {item.status === "confirmed" && (
+                <span className="inline-block text-xs px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">
+                  Confirmed
+                </span>
+              )}
+              {item.dbId && (
+                <span className="text-xs text-surface-400" title="Saved to database">
+                  <svg className="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2">

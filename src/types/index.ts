@@ -10,11 +10,12 @@ export interface ExtractedLabel {
 
 export interface ScanItem {
   id: string;
+  dbId?: string; // Database record ID (set after auto-save)
   imagePreview?: string;
   extractedData: ExtractedLabel;
   editedData: ExtractedLabel;
   timestamp: Date;
-  status: "processing" | "review" | "confirmed";
+  status: "processing" | "draft" | "confirmed";
   buildingId?: string;
   buildingName?: string;
   roomId?: string;

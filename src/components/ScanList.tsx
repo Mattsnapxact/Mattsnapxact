@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ScanItem } from "@/types";
 import ScanResult from "./ScanResult";
 import { generateCSV } from "@/lib/csv";
@@ -19,13 +20,15 @@ export default function ScanList({
   onRemoveItem,
   onClearAll,
 }: ScanListProps) {
+  const [includeDrafts, setIncludeDrafts] = useState(false);
   const confirmedCount = items.filter((i) => i.status === "confirmed").length;
+  const draftCount = items.filter((i) => i.status === "draft").length;
   const totalCount = items.length;
 
   const handleExportCSV = () => {
-    const exportItems = items.filter(
-      (i) => i.status === "confirmed" || i.status === "review"
-    );
+    const exportItems = includeDrafts
+      ? items.filter((i) => i.status === "confirmed" || i.status === "draft")
+      : items.filter((i) => i.status === "confirmed");
     if (exportItems.length === 0) return;
 
     const csv = generateCSV(exportItems);
@@ -53,10 +56,21 @@ export default function ScanList({
             Scanned Items
           </h2>
           <p className="text-sm text-surface-500">
-            {confirmedCount} of {totalCount} confirmed
+            {confirmedCount} confirmed{draftCount > 0 ? `, ${draftCount} draft${draftCount !== 1 ? "s" : ""}` : ""} &mdash; {totalCount} total
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {draftCount > 0 && (
+            <label className="flex items-center gap-1.5 text-xs text-surface-500 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={includeDrafts}
+                onChange={(e) => setIncludeDrafts(e.target.checked)}
+                className="rounded border-surface-300 text-brand-600 focus:ring-brand-500"
+              />
+              Include drafts
+            </label>
+          )}
           <button
             onClick={onClearAll}
             className="text-sm text-surface-400 hover:text-red-500 transition-default px-3 py-1.5"
@@ -65,7 +79,11 @@ export default function ScanList({
           </button>
           <button
             onClick={handleExportCSV}
-            disabled={items.filter((i) => i.status !== "processing").length === 0}
+            disabled={
+              includeDrafts
+                ? items.filter((i) => i.status === "confirmed" || i.status === "draft").length === 0
+                : confirmedCount === 0
+            }
             className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium py-2 px-4 rounded-lg transition-default disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg
