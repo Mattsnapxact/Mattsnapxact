@@ -6,7 +6,14 @@ import { v4 as uuidv4 } from "uuid";
 import CameraCapture from "@/components/CameraCapture";
 import ScanList from "@/components/ScanList";
 import LocationPicker, { SelectedLocation } from "@/components/LocationPicker";
+import DuplicateWarning, { DuplicateInfo } from "@/components/DuplicateWarning";
 import { ScanItem, ExtractedLabel } from "@/types";
+
+interface PendingDuplicate {
+  tempId: string;
+  data: ExtractedLabel;
+  duplicate: DuplicateInfo;
+}
 
 export default function ScanPage() {
   const { data: session } = useSession();
@@ -14,6 +21,7 @@ export default function ScanPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draftsLoaded, setDraftsLoaded] = useState(false);
+  const [pendingDuplicate, setPendingDuplicate] = useState<PendingDuplicate | null>(null);
   const [location, setLocation] = useState<SelectedLocation>({
     buildingId: "",
     buildingName: "",
@@ -98,6 +106,25 @@ export default function ScanPage() {
       });
   }, [session, location, draftsLoaded]);
 
+  // Check if a serial number already exists in the database
+  const checkDuplicate = useCallback(
+    async (serialNumber: string): Promise<DuplicateInfo | null> => {
+      if (!session || !serialNumber.trim()) return null;
+
+      try {
+        const res = await fetch(
+          `/api/scans/check-duplicate?serialNumber=${encodeURIComponent(serialNumber.trim())}`
+        );
+        if (!res.ok) return null;
+        const { duplicate } = await res.json();
+        return duplicate || null;
+      } catch {
+        return null;
+      }
+    },
+    [session]
+  );
+
   // Auto-save a scan to the database
   const autoSave = useCallback(
     async (data: ExtractedLabel, loc: SelectedLocation): Promise<string | null> => {
@@ -181,7 +208,29 @@ export default function ScanPage() {
 
         const { data } = (await response.json()) as { data: ExtractedLabel };
 
-        // Auto-save to DB for logged-in users
+        // Check for duplicate serial number before auto-saving
+        const duplicate = await checkDuplicate(data.serialNumber);
+
+        if (duplicate) {
+          // Pause — show warning, keep placeholder visible but stop the spinner
+          setItems((prev) =>
+            prev.map((item) =>
+              item.id === tempId
+                ? {
+                    ...item,
+                    extractedData: data,
+                    editedData: { ...data },
+                    // Keep as "processing" visually until user decides
+                    status: "processing" as const,
+                  }
+                : item
+            )
+          );
+          setPendingDuplicate({ tempId, data, duplicate });
+          return; // Wait for user decision — isProcessing stays true
+        }
+
+        // No duplicate — auto-save immediately
         const dbId = await autoSave(data, location);
 
         setItems((prev) =>
@@ -197,16 +246,16 @@ export default function ScanPage() {
               : item
           )
         );
+        setIsProcessing(false);
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Something went wrong";
         setError(message);
         setItems((prev) => prev.filter((item) => item.id !== tempId));
-      } finally {
         setIsProcessing(false);
       }
     },
-    [location, autoSave]
+    [location, autoSave, checkDuplicate]
   );
 
   const handleUpdateItem = useCallback(
@@ -273,6 +322,39 @@ export default function ScanPage() {
     [items, session]
   );
 
+  // User chose "Scan Anyway" on duplicate warning
+  const handleDuplicateScanAnyway = useCallback(async () => {
+    if (!pendingDuplicate) return;
+    const { tempId, data } = pendingDuplicate;
+    setPendingDuplicate(null);
+
+    const dbId = await autoSave(data, location);
+
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === tempId
+          ? {
+              ...item,
+              dbId: dbId || undefined,
+              extractedData: data,
+              editedData: { ...data },
+              status: "draft" as const,
+            }
+          : item
+      )
+    );
+    setIsProcessing(false);
+  }, [pendingDuplicate, autoSave, location]);
+
+  // User chose "Cancel" on duplicate warning
+  const handleDuplicateCancel = useCallback(() => {
+    if (!pendingDuplicate) return;
+    const { tempId } = pendingDuplicate;
+    setPendingDuplicate(null);
+    setItems((prev) => prev.filter((i) => i.id !== tempId));
+    setIsProcessing(false);
+  }, [pendingDuplicate]);
+
   const handleClearAll = useCallback(() => {
     setItems([]);
   }, []);
@@ -301,6 +383,15 @@ export default function ScanPage() {
           <p className="font-medium">Extraction failed</p>
           <p className="mt-1">{error}</p>
         </div>
+      )}
+
+      {/* Duplicate serial number warning */}
+      {pendingDuplicate && (
+        <DuplicateWarning
+          duplicate={pendingDuplicate.duplicate}
+          onScanAnyway={handleDuplicateScanAnyway}
+          onCancel={handleDuplicateCancel}
+        />
       )}
 
       {/* Auto-save indicator */}
