@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ScanItem } from "@/types";
+import ImagePreviewModal from "./ImagePreviewModal";
 
 interface ScanResultProps {
   item: ScanItem;
@@ -17,6 +18,7 @@ export default function ScanResult({
   onRemove,
 }: ScanResultProps) {
   const [isEditing, setIsEditing] = useState(item.status === "draft");
+  const [showPreview, setShowPreview] = useState(false);
   const data = item.editedData;
 
   const updateField = (field: string, value: string) => {
@@ -61,11 +63,32 @@ export default function ScanResult({
       <div className="flex items-center justify-between px-5 py-3 bg-surface-50 border-b border-surface-200">
         <div className="flex items-center gap-3">
           {item.imagePreview && (
-            <img
-              src={item.imagePreview}
-              alt="Label"
-              className="w-10 h-10 rounded-lg object-cover border border-surface-200"
-            />
+            <button
+              onClick={() => setShowPreview(true)}
+              className="shrink-0 group relative cursor-pointer"
+              title="View full image"
+            >
+              <img
+                src={item.imagePreview}
+                alt="Label"
+                className="w-10 h-10 rounded-lg object-cover border border-surface-200 group-hover:border-brand-400 transition-colors"
+              />
+              <div className="absolute inset-0 rounded-lg bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                <svg
+                  className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"
+                  />
+                </svg>
+              </div>
+            </button>
           )}
           <div>
             <p className="text-sm font-medium text-surface-800">
@@ -206,6 +229,15 @@ export default function ScanResult({
             )}
           </div>
         </div>
+      )}
+
+      {/* Full-screen image preview modal */}
+      {showPreview && item.imagePreview && (
+        <ImagePreviewModal
+          src={item.imagePreview}
+          alt={`${data.manufacturer || "Equipment"} ${data.model || "label"}`}
+          onClose={() => setShowPreview(false)}
+        />
       )}
     </div>
   );
