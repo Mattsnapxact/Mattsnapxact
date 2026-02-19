@@ -7,6 +7,10 @@ import CameraCapture from "@/components/CameraCapture";
 import ScanList from "@/components/ScanList";
 import LocationPicker, { SelectedLocation } from "@/components/LocationPicker";
 import DuplicateWarning, { DuplicateInfo } from "@/components/DuplicateWarning";
+import OfflineQueueBanner from "@/components/OfflineQueueBanner";
+import QueueViewer from "@/components/QueueViewer";
+import useOnlineStatus from "@/hooks/useOnlineStatus";
+import useOfflineQueue from "@/hooks/useOfflineQueue";
 import { ScanItem, ExtractedLabel } from "@/types";
 
 interface PendingDuplicate {
@@ -17,6 +21,7 @@ interface PendingDuplicate {
 
 export default function ScanPage() {
   const { data: session } = useSession();
+  const isOnline = useOnlineStatus();
   const [items, setItems] = useState<ScanItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +34,79 @@ export default function ScanPage() {
     roomName: "",
   });
   const prevLocationRef = useRef(location);
+  // Ref to always access current location from callbacks without stale closures
+  const locationRef = useRef(location);
+  locationRef.current = location;
+
+  // Auto-save a scan to the database
+  const autoSave = useCallback(
+    async (data: ExtractedLabel, loc: SelectedLocation): Promise<string | null> => {
+      if (!session) return null;
+
+      try {
+        const res = await fetch("/api/scans", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            status: "draft",
+            manufacturer: data.manufacturer,
+            model: data.model,
+            serialNumber: data.serialNumber,
+            assetTag: data.assetTag,
+            extraFields: data.extraFields,
+            rawText: data.rawText,
+            buildingId: loc.buildingId || null,
+            roomId: loc.roomId || null,
+          }),
+        });
+
+        if (!res.ok) return null;
+        const { scan } = await res.json();
+        return scan.id as string;
+      } catch {
+        return null;
+      }
+    },
+    [session]
+  );
+
+  // Callback: when an offline-queued photo finishes processing
+  const handleQueuePhotoProcessed = useCallback(
+    async (
+      data: ExtractedLabel,
+      preview: string,
+      loc: { buildingId: string; buildingName: string; roomId: string; roomName: string }
+    ) => {
+      const dbId = await autoSave(data, {
+        buildingId: loc.buildingId,
+        buildingName: loc.buildingName,
+        roomId: loc.roomId,
+        roomName: loc.roomName,
+      });
+
+      const newItem: ScanItem = {
+        id: uuidv4(),
+        dbId: dbId || undefined,
+        imagePreview: preview,
+        extractedData: data,
+        editedData: { ...data },
+        timestamp: new Date(),
+        status: "draft",
+        buildingId: loc.buildingId || undefined,
+        buildingName: loc.buildingName || undefined,
+        roomId: loc.roomId || undefined,
+        roomName: loc.roomName || undefined,
+      };
+
+      setItems((prev) => [newItem, ...prev]);
+    },
+    [autoSave]
+  );
+
+  const offlineQueue = useOfflineQueue({
+    isOnline,
+    onPhotoProcessed: handleQueuePhotoProcessed,
+  });
 
   // Load existing drafts when location changes (logged-in users)
   useEffect(() => {
@@ -125,41 +203,31 @@ export default function ScanPage() {
     [session]
   );
 
-  // Auto-save a scan to the database
-  const autoSave = useCallback(
-    async (data: ExtractedLabel, loc: SelectedLocation): Promise<string | null> => {
-      if (!session) return null;
-
-      try {
-        const res = await fetch("/api/scans", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            status: "draft",
-            manufacturer: data.manufacturer,
-            model: data.model,
-            serialNumber: data.serialNumber,
-            assetTag: data.assetTag,
-            extraFields: data.extraFields,
-            rawText: data.rawText,
-            buildingId: loc.buildingId || null,
-            roomId: loc.roomId || null,
-          }),
-        });
-
-        if (!res.ok) return null;
-        const { scan } = await res.json();
-        return scan.id as string;
-      } catch {
-        return null;
-      }
-    },
-    [session]
-  );
-
   const handleCapture = useCallback(
     async (base64: string, mimeType: string, preview: string) => {
       setError(null);
+
+      // OFFLINE: enqueue photo for later processing
+      if (!isOnline) {
+        const result = await offlineQueue.enqueuePhoto(
+          base64,
+          mimeType,
+          preview,
+          {
+            buildingId: location.buildingId,
+            buildingName: location.buildingName,
+            roomId: location.roomId,
+            roomName: location.roomName,
+          }
+        );
+
+        if (!result.success) {
+          setError(result.error || "Failed to queue photo");
+        }
+        return;
+      }
+
+      // ONLINE: process immediately (existing flow)
       setIsProcessing(true);
 
       const tempId = uuidv4();
@@ -255,7 +323,7 @@ export default function ScanPage() {
         setIsProcessing(false);
       }
     },
-    [location, autoSave, checkDuplicate]
+    [isOnline, location, autoSave, checkDuplicate, offlineQueue]
   );
 
   const handleUpdateItem = useCallback(
@@ -359,6 +427,9 @@ export default function ScanPage() {
     setItems([]);
   }, []);
 
+  // Camera is disabled when: processing an online scan, OR queue is at capacity (offline)
+  const cameraDisabled = isProcessing || (offlineQueue.isAtCapacity && !isOnline);
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
       <div className="mb-8">
@@ -374,13 +445,33 @@ export default function ScanPage() {
         <LocationPicker value={location} onChange={setLocation} />
       </div>
 
+      {/* Offline queue banner */}
+      <div className="mb-4">
+        <OfflineQueueBanner
+          isOnline={isOnline}
+          queueCount={offlineQueue.queueCount}
+          isProcessingQueue={offlineQueue.isProcessingQueue}
+          progress={offlineQueue.progress}
+          isNearCapacity={offlineQueue.isNearCapacity}
+          isAtCapacity={offlineQueue.isAtCapacity}
+          hasFailures={offlineQueue.hasFailures}
+          onProcessQueue={offlineQueue.processQueue}
+          onStopProcessing={offlineQueue.stopProcessing}
+          onRetryFailed={offlineQueue.retryFailed}
+          onViewQueue={() => offlineQueue.setShowQueueViewer(true)}
+          onDismissProgress={offlineQueue.dismissProgress}
+        />
+      </div>
+
       {/* Camera / Upload */}
-      <CameraCapture onCapture={handleCapture} disabled={isProcessing} />
+      <CameraCapture onCapture={handleCapture} disabled={cameraDisabled} />
 
       {/* Error message */}
       {error && (
         <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-          <p className="font-medium">Extraction failed</p>
+          <p className="font-medium">
+            {isOnline ? "Extraction failed" : "Queue error"}
+          </p>
           <p className="mt-1">{error}</p>
         </div>
       )}
@@ -414,6 +505,16 @@ export default function ScanPage() {
           onClearAll={handleClearAll}
         />
       </div>
+
+      {/* Queue viewer modal */}
+      {offlineQueue.showQueueViewer && (
+        <QueueViewer
+          queue={offlineQueue.queue}
+          onRefresh={offlineQueue.refreshFullQueue}
+          onRemove={offlineQueue.removePhoto}
+          onClose={() => offlineQueue.setShowQueueViewer(false)}
+        />
+      )}
     </div>
   );
 }
