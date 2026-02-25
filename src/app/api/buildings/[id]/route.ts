@@ -18,11 +18,17 @@ export async function DELETE(
       );
     }
 
-    const userId = (session.user as { id: string }).id;
+    const orgId = session.user.organizationId;
+    if (!orgId) {
+      return NextResponse.json(
+        { error: "No organisation assigned" },
+        { status: 403 }
+      );
+    }
 
-    // Verify ownership
+    // Verify building belongs to this organisation
     const building = await prisma.building.findFirst({
-      where: { id: params.id, userId },
+      where: { id: params.id, organizationId: orgId },
     });
 
     if (!building) {

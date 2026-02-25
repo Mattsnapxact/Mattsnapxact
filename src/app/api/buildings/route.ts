@@ -15,10 +15,16 @@ export async function GET() {
       );
     }
 
-    const userId = (session.user as { id: string }).id;
+    const orgId = session.user.organizationId;
+    if (!orgId) {
+      return NextResponse.json(
+        { error: "No organisation assigned" },
+        { status: 403 }
+      );
+    }
 
     const buildings = await prisma.building.findMany({
-      where: { userId },
+      where: { organizationId: orgId },
       include: { rooms: { orderBy: { name: "asc" } } },
       orderBy: { name: "asc" },
     });
@@ -44,7 +50,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const userId = (session.user as { id: string }).id;
+    const orgId = session.user.organizationId;
+    if (!orgId) {
+      return NextResponse.json(
+        { error: "No organisation assigned" },
+        { status: 403 }
+      );
+    }
+
+    const userId = session.user.id;
     const { name } = await request.json();
 
     if (!name || typeof name !== "string" || !name.trim()) {
@@ -55,7 +69,7 @@ export async function POST(request: NextRequest) {
     }
 
     const building = await prisma.building.create({
-      data: { name: name.trim(), userId },
+      data: { name: name.trim(), userId, organizationId: orgId },
       include: { rooms: true },
     });
 

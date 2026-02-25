@@ -12,7 +12,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ duplicate: null });
     }
 
-    const userId = (session.user as { id: string }).id;
+    const orgId = session.user.organizationId;
+    if (!orgId) {
+      return NextResponse.json({ duplicate: null });
+    }
+
     const { searchParams } = new URL(request.url);
     const serialNumber = searchParams.get("serialNumber");
 
@@ -22,7 +26,7 @@ export async function GET(request: NextRequest) {
 
     const existing = await prisma.scan.findFirst({
       where: {
-        userId,
+        organizationId: orgId,
         serialNumber: serialNumber.trim(),
       },
       include: {

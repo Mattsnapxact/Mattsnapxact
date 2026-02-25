@@ -15,13 +15,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const userId = (session.user as { id: string }).id;
+    const orgId = session.user.organizationId;
+    if (!orgId) {
+      return NextResponse.json(
+        { error: "No organisation assigned" },
+        { status: 403 }
+      );
+    }
+
+    const userId = session.user.id;
     const { searchParams } = new URL(request.url);
     const buildingId = searchParams.get("buildingId");
     const roomId = searchParams.get("roomId");
 
     const where: Record<string, unknown> = {
       userId,
+      organizationId: orgId,
       status: "draft",
     };
 
