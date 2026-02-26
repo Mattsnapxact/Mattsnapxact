@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: NextRequest) {
   try {
     const { prisma } = await import("@/lib/prisma");
@@ -13,13 +15,47 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const userId = (session.user as { id: string }).id;
+    const orgId = session.user.organizationId;
+    if (!orgId) {
+      return NextResponse.json(
+        { error: "No organisation assigned" },
+        { status: 403 }
+      );
+    }
+
+    const userId = session.user.id;
     const body = await request.json();
 
-    // Single scan auto-save
+    // Validate buildingId belongs to this organisation
+    if (body.buildingId) {
+      const building = await prisma.building.findFirst({
+        where: { id: body.buildingId, organizationId: orgId },
+      });
+      if (!building) {
+        return NextResponse.json(
+          { error: "Building not found" },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Validate roomId belongs to this organisation
+    if (body.roomId) {
+      const room = await prisma.room.findFirst({
+        where: { id: body.roomId, organizationId: orgId },
+      });
+      if (!room) {
+        return NextResponse.json(
+          { error: "Room not found" },
+          { status: 403 }
+        );
+      }
+    }
+
     const scan = await prisma.scan.create({
       data: {
         userId,
+        organizationId: orgId,
         status: body.status || "draft",
         manufacturer: body.manufacturer || null,
         model: body.model || null,
@@ -56,11 +92,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const userId = (session.user as { id: string }).id;
-    const { searchParams } = new URL(request.url);
-    const statusFilter = searchParams.get("status"); // "draft", "confirmed", or null (all)
+    const orgId = session.user.organizationId;
+    if (!orgId) {
+      return NextResponse.json(
+        { error: "No organisation assigned" },
+        { status: 403 }
+      );
+    }
 
-    const where: Record<string, unknown> = { userId };
+    const userId = session.user.id;
+    const { searchParams } = new URL(request.url);
+    const statusFilter = searchParams.get("status");
+
+    const where: Record<string, unknown> = { userId, organizationId: orgId };
     if (statusFilter) where.status = statusFilter;
 
     const scans = await prisma.scan.findMany({

@@ -7,10 +7,8 @@ import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -20,43 +18,17 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      if (isSignUp) {
-        const res = await fetch("/api/auth/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password, name }),
-        });
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
 
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "Registration failed");
-        }
-
-        // Auto sign in after registration
-        const signInResult = await signIn("credentials", {
-          email,
-          password,
-          redirect: false,
-        });
-
-        if (signInResult?.error) {
-          throw new Error("Account created but sign in failed. Please sign in manually.");
-        }
-
-        router.push("/scan");
-      } else {
-        const result = await signIn("credentials", {
-          email,
-          password,
-          redirect: false,
-        });
-
-        if (result?.error) {
-          throw new Error("Invalid email or password");
-        }
-
-        router.push("/scan");
+      if (result?.error) {
+        throw new Error("Invalid email or password");
       }
+
+      router.push("/scan");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -69,31 +41,14 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-surface-900">
-            {isSignUp ? "Create an account" : "Welcome back"}
+            Welcome back
           </h1>
           <p className="text-sm text-surface-500 mt-2">
-            {isSignUp
-              ? "Sign up to save your scan history"
-              : "Sign in to access your scan history"}
+            Sign in to access your scan history
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {isSignUp && (
-            <div>
-              <label className="block text-sm font-medium text-surface-700 mb-1">
-                Name
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-3.5 py-2.5 text-sm border border-surface-300 rounded-lg bg-white text-surface-800 placeholder-surface-400"
-                placeholder="Your name (optional)"
-              />
-            </div>
-          )}
-
           <div>
             <label className="block text-sm font-medium text-surface-700 mb-1">
               Email
@@ -119,7 +74,7 @@ export default function LoginPage() {
               required
               minLength={8}
               className="w-full px-3.5 py-2.5 text-sm border border-surface-300 rounded-lg bg-white text-surface-800 placeholder-surface-400"
-              placeholder={isSignUp ? "At least 8 characters" : "Your password"}
+              placeholder="Your password"
             />
           </div>
 
@@ -134,29 +89,11 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 px-4 rounded-lg transition-default disabled:opacity-50"
           >
-            {loading
-              ? "Please wait..."
-              : isSignUp
-              ? "Create account"
-              : "Sign in"}
+            {loading ? "Please wait..." : "Sign in"}
           </button>
         </form>
 
         <div className="mt-6 text-center">
-          <button
-            onClick={() => {
-              setIsSignUp(!isSignUp);
-              setError("");
-            }}
-            className="text-sm text-brand-600 hover:text-brand-700 font-medium"
-          >
-            {isSignUp
-              ? "Already have an account? Sign in"
-              : "Don't have an account? Sign up"}
-          </button>
-        </div>
-
-        <div className="mt-4 text-center">
           <Link
             href="/scan"
             className="text-sm text-surface-400 hover:text-surface-600"

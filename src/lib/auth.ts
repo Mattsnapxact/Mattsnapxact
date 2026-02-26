@@ -27,9 +27,14 @@ export const authOptions: NextAuthOptions = {
 
           const user = await prisma.user.findUnique({
             where: { email: credentials.email },
+            include: { organization: { select: { name: true } } },
           });
 
           if (!user) {
+            return null;
+          }
+
+          if (!user.isActive) {
             return null;
           }
 
@@ -43,6 +48,9 @@ export const authOptions: NextAuthOptions = {
             id: user.id,
             email: user.email,
             name: user.name,
+            organizationId: user.organizationId,
+            organizationName: user.organization?.name || null,
+            isAdmin: user.isAdmin,
           };
         } catch {
           return null;
@@ -51,9 +59,20 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.organizationId = user.organizationId;
+        token.organizationName = user.organizationName;
+        token.isAdmin = user.isAdmin;
+      }
+      return token;
+    },
     async session({ session, token }) {
       if (token && session.user) {
         (session.user as { id: string }).id = token.sub!;
+        session.user.organizationId = token.organizationId;
+        session.user.organizationName = token.organizationName;
+        session.user.isAdmin = token.isAdmin;
       }
       return session;
     },

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
     const { prisma } = await import("@/lib/prisma");
@@ -10,7 +12,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ duplicate: null });
     }
 
-    const userId = (session.user as { id: string }).id;
+    const orgId = session.user.organizationId;
+    if (!orgId) {
+      return NextResponse.json({ duplicate: null });
+    }
+
     const { searchParams } = new URL(request.url);
     const serialNumber = searchParams.get("serialNumber");
 
@@ -20,7 +26,7 @@ export async function GET(request: NextRequest) {
 
     const existing = await prisma.scan.findFirst({
       where: {
-        userId,
+        organizationId: orgId,
         serialNumber: serialNumber.trim(),
       },
       include: {

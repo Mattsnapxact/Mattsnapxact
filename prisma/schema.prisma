@@ -7,67 +7,92 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
+model Organization {
   id        String     @id @default(uuid())
-  email     String     @unique
-  password  String
-  name      String?
+  name      String
   createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  scans     Scan[]
+  users     User[]
   buildings Building[]
   rooms     Room[]
+  scans     Scan[]
+}
+
+model User {
+  id             String        @id @default(uuid())
+  email          String        @unique
+  password       String
+  name           String?
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  isAdmin        Boolean       @default(false)
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  scans          Scan[]
+  buildings      Building[]
+  rooms          Room[]
+
+  @@index([organizationId])
 }
 
 model Building {
-  id        String   @id @default(uuid())
-  name      String
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  createdAt DateTime @default(now())
-  rooms     Room[]
-  scans     Scan[]
+  id             String       @id @default(uuid())
+  name           String
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime     @default(now())
+  rooms          Room[]
+  scans          Scan[]
 
   @@index([userId])
+  @@index([organizationId])
 }
 
 model Room {
-  id         String   @id @default(uuid())
-  name       String
-  buildingId String
-  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-  userId     String
-  user       User     @relation(fields: [userId], references: [id])
-  createdAt  DateTime @default(now())
-  scans      Scan[]
+  id             String       @id @default(uuid())
+  name           String
+  buildingId     String
+  building       Building     @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime     @default(now())
+  scans          Scan[]
 
   @@index([buildingId])
   @@index([userId])
+  @@index([organizationId])
 }
 
 model Scan {
-  id           String    @id @default(uuid())
-  userId       String?
-  user         User?     @relation(fields: [userId], references: [id])
-  buildingId   String?
-  building     Building? @relation(fields: [buildingId], references: [id])
-  roomId       String?
-  room         Room?     @relation(fields: [roomId], references: [id])
-  status       String    @default("draft") // "draft" or "confirmed"
-  imageUrl     String?
-  rawText      String?
-  manufacturer String?
-  model        String?
-  serialNumber String?
-  assetTag     String?
-  extraFields  String?  // JSON string for additional detected fields
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @default(now()) @updatedAt
-  batchId      String?
+  id             String        @id @default(uuid())
+  userId         String?
+  user           User?         @relation(fields: [userId], references: [id])
+  buildingId     String?
+  building       Building?     @relation(fields: [buildingId], references: [id])
+  roomId         String?
+  room           Room?         @relation(fields: [roomId], references: [id])
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  status         String        @default("draft") // "draft" or "confirmed"
+  imageUrl       String?
+  rawText        String?
+  manufacturer   String?
+  model          String?
+  serialNumber   String?
+  assetTag       String?
+  extraFields    String?  // JSON string for additional detected fields
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+  batchId        String?
 
   @@index([userId])
   @@index([batchId])
   @@index([buildingId])
   @@index([roomId])
+  @@index([organizationId])
   @@index([userId, status])
 }

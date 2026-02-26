@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: NextRequest) {
   try {
     const { prisma } = await import("@/lib/prisma");
@@ -13,7 +15,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const userId = (session.user as { id: string }).id;
+    const orgId = session.user.organizationId;
+    if (!orgId) {
+      return NextResponse.json(
+        { error: "No organisation assigned" },
+        { status: 403 }
+      );
+    }
+
+    const userId = session.user.id;
     const { name, buildingId } = await request.json();
 
     if (!name || typeof name !== "string" || !name.trim()) {
@@ -30,20 +40,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify the building belongs to this user
+    // Verify the building belongs to this organisation
     const building = await prisma.building.findFirst({
-      where: { id: buildingId, userId },
+      where: { id: buildingId, organizationId: orgId },
     });
 
     if (!building) {
       return NextResponse.json(
         { error: "Building not found" },
-        { status: 404 }
+        { status: 403 }
       );
     }
 
     const room = await prisma.room.create({
-      data: { name: name.trim(), buildingId, userId },
+      data: { name: name.trim(), buildingId, userId, organizationId: orgId },
     });
 
     return NextResponse.json({ room }, { status: 201 });

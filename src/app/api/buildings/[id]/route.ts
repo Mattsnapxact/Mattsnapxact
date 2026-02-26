@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: { id: string } }
@@ -16,11 +18,17 @@ export async function DELETE(
       );
     }
 
-    const userId = (session.user as { id: string }).id;
+    const orgId = session.user.organizationId;
+    if (!orgId) {
+      return NextResponse.json(
+        { error: "No organisation assigned" },
+        { status: 403 }
+      );
+    }
 
-    // Verify ownership
+    // Verify building belongs to this organisation
     const building = await prisma.building.findFirst({
-      where: { id: params.id, userId },
+      where: { id: params.id, organizationId: orgId },
     });
 
     if (!building) {
