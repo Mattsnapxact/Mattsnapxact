@@ -232,6 +232,7 @@ img{max-width:100%;display:block}
         <li><a href="#how-it-works">How It Works</a></li>
         <li><a href="#sectors">Sectors</a></li>
         <li><a href="#contact">Contact</a></li>
+        <li><a href="<?php echo home_url('/leadership-report'); ?>">Leadership Report</a></li>
         <li><a href="#contact" class="sx-btn sx-btn-primary">Get In Touch</a></li>
       </ul>
 
@@ -245,6 +246,7 @@ img{max-width:100%;display:block}
       <a href="#how-it-works" class="sx-mobile-nav-link">How It Works</a>
       <a href="#sectors" class="sx-mobile-nav-link">Sectors</a>
       <a href="#contact" class="sx-mobile-nav-link">Contact</a>
+      <a href="<?php echo home_url('/leadership-report'); ?>" class="sx-mobile-nav-link">Leadership Report</a>
       <a href="#contact" class="sx-btn sx-btn-primary sx-mobile-nav-link">Get In Touch</a>
     </div>
   </div>
@@ -527,6 +529,7 @@ img{max-width:100%;display:block}
         <li><a href="#how-it-works">How It Works</a></li>
         <li><a href="#sectors">Sectors</a></li>
         <li><a href="#contact">Contact</a></li>
+        <li><a href="<?php echo home_url('/leadership-report'); ?>">Leadership Report</a></li>
       </ul>
       <span class="sx-footer-copy">&copy; <?php echo date('Y'); ?> SnapXact. Asset Intelligence Services.</span>
     </div>
