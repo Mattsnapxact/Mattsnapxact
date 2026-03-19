@@ -24,11 +24,46 @@ export default function Home() {
               href="/scan"
               className="inline-flex items-center justify-center rounded-lg border border-surface-200 bg-white px-5 py-2.5 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors"
             >
-              Go to scanner
+              Try demo scanner
             </Link>
+            <p className="text-xs text-surface-500 leading-relaxed">
+              Upload an equipment label and see how SnapXact extracts structured
+              data in seconds.
+            </p>
           </div>
 
-          <ul className="mt-10 space-y-2 text-left text-sm text-surface-600">
+          <p className="mt-4 text-xs text-surface-400 leading-relaxed">
+            Demo mode for preview. Workspace features, saved records and exports
+            require sign in.
+          </p>
+
+          <div className="mt-10 rounded-lg border border-surface-200 bg-surface-50 px-5 py-5">
+            <h2 className="text-sm font-medium text-surface-700 mb-4">
+              How it works
+            </h2>
+            <ol className="space-y-3 text-left text-sm text-surface-600">
+              <li className="flex items-start gap-3">
+                <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-brand-600 text-[11px] font-semibold text-white">
+                  1
+                </span>
+                Upload a label
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-brand-600 text-[11px] font-semibold text-white">
+                  2
+                </span>
+                SnapXact extracts the data
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-brand-600 text-[11px] font-semibold text-white">
+                  3
+                </span>
+                Export or manage inside your workspace
+              </li>
+            </ol>
+          </div>
+
+          <ul className="mt-8 space-y-2 text-left text-sm text-surface-600">
             <li className="flex items-start gap-2.5">
               <svg
                 className="mt-0.5 h-4 w-4 flex-shrink-0 text-brand-600"
