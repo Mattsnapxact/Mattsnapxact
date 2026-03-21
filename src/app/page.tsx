@@ -2,14 +2,10 @@
 
 import { signIn } from 'next-auth/react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
 export default function Home() {
-  const [mounted, setMounted] = useState(false);
-
   useEffect(() => {
-    setMounted(true);
-    
     // Create floating particles
     const container = document.getElementById('particles');
     if (!container) return;
