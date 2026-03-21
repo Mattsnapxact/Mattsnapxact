@@ -1,7 +1,6 @@
 'use client';
 
 import { signIn } from 'next-auth/react';
-import Link from 'next/link';
 import { useEffect } from 'react';
 
 export default function Home() {
@@ -171,20 +170,16 @@ export default function Home() {
                 <span className="relative">Sign in</span>
               </button>
 
-              {/* Demo Scanner Link */}
-              <Link
-                href="/scan"
+              {/* Request Demo Link */}
+              <a
+                href="mailto:my@snapxact.com?subject=SnapXact Demo Request"
                 className="mb-3 flex w-full items-center justify-center rounded-2xl border border-gray-700/50 bg-gray-800/40 px-6 py-4 text-base font-semibold text-gray-300 backdrop-blur-sm transition-all duration-300 hover:border-blue-500/30 hover:bg-gray-800/60 hover:text-white"
               >
-                Try demo scanner
-              </Link>
+                Request Demo
+              </a>
 
               <p className="text-center text-xs leading-relaxed text-gray-500">
-                Upload an equipment label and see how SnapXact extracts structured data in seconds.
-              </p>
-
-              <p className="mt-4 text-center text-xs leading-relaxed text-gray-600">
-                Demo mode for preview. Workspace features, saved records and exports require sign in.
+                See SnapXact in action with a guided walkthrough tailored to your organisation.
               </p>
             </div>
           </div>
@@ -283,3 +278,4 @@ export default function Home() {
     </>
   );
 }
+
