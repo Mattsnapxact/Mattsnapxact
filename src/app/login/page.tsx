@@ -3,8 +3,6 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -93,14 +91,9 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-6 text-center">
-          <Link
-            href="/scan"
-            className="text-sm text-surface-400 hover:text-surface-600"
-          >
-            Skip — use without an account
-          </Link>
-        </div>
+        <p className="mt-6 text-center text-xs text-surface-400">
+          Need an account? Contact your organisation administrator.
+        </p>
       </div>
     </div>
   );

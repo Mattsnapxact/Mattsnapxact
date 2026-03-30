@@ -144,14 +144,7 @@ export default function Home() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
             </Link>
-            <Link href="/scan" className="gateway-btn-secondary">
-              Try demo scanner
-            </Link>
           </div>
-
-          <p className="gateway-demo-hint">
-            Upload an equipment label and see SnapXact extract structured data in seconds.
-          </p>
         </section>
 
         {/* Live demo visual */}
@@ -217,9 +210,9 @@ export default function Home() {
 
         {/* Disclaimer */}
         <p className="gateway-disclaimer">
-          Demo mode for preview. Workspace features, saved records and exports require sign in.
+          Access is managed by organisation administrators.
           <br />
-          Access is managed by organisation administrators. Contact your administrator or SnapXact for an account.
+          Need an account? Contact your administrator or SnapXact.
         </p>
       </div>
 
