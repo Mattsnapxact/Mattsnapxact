@@ -125,18 +125,21 @@ export default function ScanResult({
           {item.status !== "confirmed" && (
             <button
               onClick={() => setIsEditing(!isEditing)}
-              className="text-xs font-medium text-brand-600 hover:text-brand-700 transition-default"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm"
             >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
               {isEditing ? "Collapse" : "Edit"}
             </button>
           )}
           <button
             onClick={() => onRemove(item.id)}
-            className="text-surface-400 hover:text-red-500 transition-default"
+            className="p-2 text-surface-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
             title="Remove"
           >
             <svg
-              className="w-4 h-4"
+              className="w-5 h-5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -152,9 +155,9 @@ export default function ScanResult({
         </div>
       </div>
 
-      {/* Editable fields */}
+      {/* Editable fields - SCROLLABLE CONTAINER */}
       {isEditing && (
-        <div className="p-5 space-y-3">
+        <div className="p-5 space-y-3 max-h-[600px] overflow-y-auto">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <FieldInput
               label="Manufacturer"
@@ -204,7 +207,7 @@ export default function ScanResult({
               onConfirm(item.id);
               setIsEditing(false);
             }}
-            className="w-full bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2.5 rounded-lg transition-default"
+            className="w-full bg-green-600 hover:bg-green-700 text-white text-sm font-semibold py-3 rounded-lg transition-colors shadow-sm"
           >
             Confirm Data
           </button>
@@ -261,7 +264,7 @@ function FieldInput({
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-3 py-2 text-sm border border-surface-200 rounded-lg bg-white text-surface-800 placeholder-surface-300 focus:border-brand-500"
+        className="w-full px-3 py-2 text-sm border border-surface-200 rounded-lg bg-white text-surface-800 placeholder-surface-300 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-colors"
         placeholder={`Enter ${label.toLowerCase()}`}
       />
     </div>
