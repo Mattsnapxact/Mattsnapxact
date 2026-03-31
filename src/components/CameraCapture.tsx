@@ -7,6 +7,105 @@ interface CameraCaptureProps {
   disabled?: boolean;
 }
 
+// MIME types accepted by GPT-4o-mini vision
+const SUPPORTED_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+]);
+
+// Map file extensions to MIME types for fallback detection
+const EXT_TO_MIME: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp",
+  heic: "image/heic",
+  heif: "image/heif",
+};
+
+/**
+ * Resolve a usable MIME type from a File object.
+ * iOS photo library picks can have an empty or incorrect file.type,
+ * so we fall back to the file extension.
+ */
+function resolveMimeType(file: File): string {
+  if (file.type && file.type !== "application/octet-stream") {
+    return file.type.toLowerCase();
+  }
+  const ext = file.name.split(".").pop()?.toLowerCase() || "";
+  return EXT_TO_MIME[ext] || "";
+}
+
+/**
+ * Returns true when the MIME type is HEIC/HEIF (Apple's photo format).
+ */
+function isHeicType(mime: string): boolean {
+  return mime === "image/heic" || mime === "image/heif";
+}
+
+/**
+ * Convert a HEIC/HEIF (or any non-JPEG) blob to JPEG via an off-screen canvas.
+ * Safari on iOS >=17 can decode HEIC natively so createImageBitmap works.
+ * Returns { base64, mimeType, dataUrl } or throws.
+ */
+async function convertToJpeg(
+  file: File
+): Promise<{ base64: string; mimeType: string; dataUrl: string }> {
+  const bitmap = await createImageBitmap(file);
+  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not create canvas context");
+  ctx.drawImage(bitmap, 0, 0);
+  bitmap.close();
+
+  const blob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.92 });
+  const arrayBuf = await blob.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuf);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  const base64 = btoa(binary);
+  const dataUrl = `data:image/jpeg;base64,${base64}`;
+  return { base64, mimeType: "image/jpeg", dataUrl };
+}
+
+/**
+ * Read a File as a data URL and extract the base64 payload.
+ * Validates the data URL format defensively.
+ */
+function readFileAsBase64(
+  file: File,
+  mimeType: string
+): Promise<{ base64: string; dataUrl: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      if (typeof dataUrl !== "string" || !dataUrl.includes(",")) {
+        reject(new Error("Could not read the selected image. Please try a different photo."));
+        return;
+      }
+      const base64 = dataUrl.split(",")[1];
+      if (!base64) {
+        reject(new Error("Image data was empty. Please try a different photo."));
+        return;
+      }
+      // If the browser wrote a generic or missing MIME in the data URL,
+      // rebuild it with the resolved MIME type so downstream is correct.
+      const correctedDataUrl = `data:${mimeType};base64,${base64}`;
+      resolve({ base64, dataUrl: correctedDataUrl });
+    };
+    reader.onerror = () => {
+      reject(new Error("Failed to read the image file. Please try again."));
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function CameraCapture({
   onCapture,
   disabled,
@@ -14,26 +113,67 @@ export default function CameraCapture({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [converting, setConverting] = useState(false);
 
   const processFile = useCallback(
-    (file: File) => {
-      if (!file.type.startsWith("image/")) {
-        alert("Please select an image file.");
+    async (file: File) => {
+      // 1. Resolve MIME type (handles empty file.type on iOS)
+      const mime = resolveMimeType(file);
+
+      if (!mime || !mime.startsWith("image/")) {
+        alert("Please select an image file (JPEG, PNG, GIF, or WebP).");
         return;
       }
 
+      // 2. Size check
       if (file.size > 20 * 1024 * 1024) {
         alert("Image is too large. Please use an image under 20MB.");
         return;
       }
 
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result as string;
-        const base64 = dataUrl.split(",")[1];
-        onCapture(base64, file.type, dataUrl);
-      };
-      reader.readAsDataURL(file);
+      try {
+        // 3. HEIC/HEIF — convert to JPEG before sending
+        if (isHeicType(mime)) {
+          setConverting(true);
+          try {
+            const result = await convertToJpeg(file);
+            onCapture(result.base64, result.mimeType, result.dataUrl);
+          } catch {
+            alert(
+              "This image format (HEIC) could not be converted. Please open the photo in your Photos app, take a screenshot, and upload that instead."
+            );
+          } finally {
+            setConverting(false);
+          }
+          return;
+        }
+
+        // 4. Unsupported image type (e.g. BMP, TIFF) — try canvas conversion
+        if (!SUPPORTED_MIME_TYPES.has(mime)) {
+          setConverting(true);
+          try {
+            const result = await convertToJpeg(file);
+            onCapture(result.base64, result.mimeType, result.dataUrl);
+          } catch {
+            alert(
+              `This image format (${mime}) is not supported. Please use JPEG, PNG, GIF, or WebP.`
+            );
+          } finally {
+            setConverting(false);
+          }
+          return;
+        }
+
+        // 5. Standard supported format — read as base64
+        const { base64, dataUrl } = await readFileAsBase64(file, mime);
+        onCapture(base64, mime, dataUrl);
+      } catch (err) {
+        const msg =
+          err instanceof Error
+            ? err.message
+            : "Could not process the image. Please try a different photo.";
+        alert(msg);
+      }
     },
     [onCapture]
   );
@@ -59,7 +199,7 @@ export default function CameraCapture({
           dragOver
             ? "border-brand-500 bg-brand-50"
             : "border-surface-300 hover:border-brand-400 hover:bg-surface-50"
-        } ${disabled ? "opacity-50 pointer-events-none" : ""}`}
+        } ${disabled || converting ? "opacity-50 pointer-events-none" : ""}`}
         onDragOver={(e) => {
           e.preventDefault();
           setDragOver(true);
@@ -86,10 +226,12 @@ export default function CameraCapture({
           </div>
           <div>
             <p className="text-base font-medium text-surface-700">
-              Upload a label photo
+              {converting ? "Converting image…" : "Upload a label photo"}
             </p>
             <p className="text-sm text-surface-400 mt-1">
-              Drag and drop or click to browse
+              {converting
+                ? "This may take a moment"
+                : "Drag and drop or click to browse"}
             </p>
           </div>
         </div>
@@ -98,7 +240,7 @@ export default function CameraCapture({
       {/* Camera button (shown on all devices, gracefully fails on desktop) */}
       <button
         onClick={() => cameraInputRef.current?.click()}
-        disabled={disabled}
+        disabled={disabled || converting}
         className="w-full flex items-center justify-center gap-3 bg-brand-600 hover:bg-brand-700 text-white font-medium py-3.5 px-6 rounded-xl transition-default disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <svg

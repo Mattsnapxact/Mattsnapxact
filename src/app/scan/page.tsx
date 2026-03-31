@@ -316,8 +316,17 @@ export default function ScanPage() {
         );
         setIsProcessing(false);
       } catch (err) {
-        const message =
+        let message =
           err instanceof Error ? err.message : "Something went wrong";
+        // Replace opaque browser errors with user-friendly messages
+        if (
+          message.includes("did not match the expected pattern") ||
+          message.includes("Failed to fetch")
+        ) {
+          message = isOnline
+            ? "Could not process the image. Please try a different photo or check your connection."
+            : "You appear to be offline. The photo has not been queued — please reconnect and try again.";
+        }
         setError(message);
         setItems((prev) => prev.filter((item) => item.id !== tempId));
         setIsProcessing(false);
