@@ -172,7 +172,6 @@ export default function Home() {
               </div>
             </div>
           </div>
-        </section>
 
           {/* Main Card */}
           <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-gray-900/80 via-gray-900/60 to-gray-900/80 p-8 shadow-2xl backdrop-blur-xl fade-up delay-2">
@@ -244,7 +243,6 @@ export default function Home() {
               </ol>
             </div>
           </div>
-        </section>
 
           {/* Feature Pills */}
           <ul className="mt-6 space-y-3 text-left text-sm text-gray-400 fade-up delay-4">
