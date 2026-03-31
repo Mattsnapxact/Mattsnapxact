@@ -3,32 +3,6 @@
 import { signIn } from 'next-auth/react';
 import { useEffect } from 'react';
 
-/* ── Step card ── */
-function StepCard({
-  number,
-  icon,
-  title,
-  description,
-}: {
-  number: number;
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="gateway-step">
-      <div className="gateway-step-icon">
-        <span className="gateway-step-number">{number}</span>
-        {icon}
-      </div>
-      <h3 className="text-sm font-semibold text-surface-900 mt-3">{title}</h3>
-      <p className="text-xs text-surface-500 mt-1 leading-relaxed">
-        {description}
-      </p>
-    </div>
-  );
-}
-
 /* ── Page ── */
 export default function Home() {
   useEffect(() => {
